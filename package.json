@@ -1,11 +1,11 @@
 {
   "name": "click-2-hack",
   "version": "1.0.0",
+  "main": "api/index.js",
   "dependencies": {
-    "sqlite3": "^5.1.6",
     "sqlite": "^5.1.1"
   },
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   }
 }
