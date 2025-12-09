@@ -1,0 +1,413 @@
+/* ===== GLOBAL THEME & RESET ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Color Palette */
+    --background-dark: #1E1E1E;
+    --primary-dark: #121212;
+    --card-dark: #2C2C2C;
+    --text-primary: #FFFFFF;
+    --text-secondary: #B0B0B0;
+    --accent-blue: #4A90E2;
+    --accent-purple: #9B59B6;
+    --online-status: #2ECC71;
+    --offline-status: #E74C3C;
+    --button-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --border-radius: 12px;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-dark);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* ===== HEADER ===== */
+.header {
+    background: var(--primary-dark);
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* ===== CONTAINER ===== */
+.container {
+    max-width: 100%;
+    padding: 20px;
+    margin: 0 auto;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+    background: var(--button-gradient);
+    color: var(--text-primary);
+    border: none;
+    padding: 14px 24px;
+    border-radius: var(--border-radius);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    margin: 8px 0;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.btn-full {
+    grid-column: 1 / -1;
+}
+
+/* ===== DEVICE CARDS ===== */
+.device-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.device-card {
+    background: var(--card-dark);
+    border: 2px solid var(--accent-blue);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.device-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(74, 144, 226, 0.3);
+}
+
+.device-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.device-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.device-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+.status-dot.online {
+    background: var(--online-status);
+}
+
+.status-dot.offline {
+    background: var(--offline-status);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.device-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.delete-icon {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    color: var(--offline-status);
+    font-size: 20px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.delete-icon:hover {
+    transform: scale(1.2);
+}
+
+/* ===== DEVICE CONTROL PAGE ===== */
+.control-header {
+    background: var(--primary-dark);
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+    border-radius: var(--border-radius);
+}
+
+.control-header h2 {
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.control-header p {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.sms-section {
+    background: var(--card-dark);
+    border: 2px solid var(--accent-blue);
+    border-radius: var(--border-radius);
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.sms-section h3 {
+    margin-bottom: 16px;
+    font-size: 18px;
+}
+
+.sms-list {
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.sms-item {
+    background: var(--primary-dark);
+    padding: 12px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-blue);
+    position: relative;
+}
+
+.sms-sender {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.sms-body {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.sms-time {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ===== MODAL/POPUP ===== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--card-dark);
+    border: 2px solid var(--accent-blue);
+    border-radius: var(--border-radius);
+    padding: 24px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary-dark);
+    border: 1px solid var(--accent-blue);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.btn-cancel {
+    background: var(--offline-status);
+}
+
+.btn-confirm {
+    background: var(--online-status);
+}
+
+/* ===== FORM LIST PAGE ===== */
+.form-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-card {
+    background: var(--card-dark);
+    border: 2px solid var(--accent-blue);
+    border-radius: var(--border-radius);
+    padding: 16px;
+}
+
+.form-data {
+    color: var(--text-secondary);
+    font-size: 14px;
+    white-space: pre-wrap;
+    margin-bottom: 8px;
+}
+
+.form-time {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ===== LOADING SPINNER ===== */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--text-secondary);
+    border-top-color: var(--accent-blue);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--primary-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-purple);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .container {
+        padding: 12px;
+    }
+    
+    .btn {
+        padding: 12px 20px;
+        font-size: 14px;
+    }
+    
+    .device-name {
+        font-size: 16px;
+    }
+    
+    .modal-content {
+        padding: 20px;
+    }
+}
+
+/* ===== UTILITY CLASSES ===== */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+.mb-20 {
+    margin-bottom: 20px;
+}
