@@ -1,11 +1,18 @@
 {
-  "name": "click-2-hack",
-  "version": "1.0.0",
-  "main": "api/index.js",
-  "dependencies": {
-    "sqlite": "^5.1.1"
-  },
-  "engines": {
-    "node": "20.x"
-  }
+    "name": "c2h-admin-panel",
+    "version": "1.0.0",
+    "description": "C2H Android Remote Management Panel",
+    "main": "api/index.js",
+    "scripts": {
+        "start": "node api/index.js",
+        "dev": "node api/index.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "cors": "^2.8.5",
+        "better-sqlite3": "^9.2.2"
+    },
+    "engines": {
+        "node": ">=18.x"
+    }
 }
