@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C2H Admin Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>C2H Admin Panel</h1>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Main Buttons -->
+        <div class="btn-grid">
+            <button class="btn" onclick="openForwardingModal()">UPDATE FORWARDING</button>
+            <button class="btn" onclick="openTelegramModal()">UPDATE TELEGRAM</button>
+        </div>
+
+        <!-- Device List -->
+        <div id="deviceList" class="device-list">
+            <!-- Devices will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Update Forwarding Modal -->
+    <div id="forwardingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Update Forwarding Number</div>
+            <div class="form-group">
+                <label>Forwarding Number</label>
+                <input type="tel" id="forwardNumber" placeholder="+911234567890">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal('forwardingModal')">Cancel</button>
+                <button class="btn btn-confirm" onclick="updateForwarding()">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Telegram Modal -->
+    <div id="telegramModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Update Telegram Details</div>
+            <div class="form-group">
+                <label>Bot Token</label>
+                <input type="text" id="telegramToken" placeholder="Enter bot token">
+            </div>
+            <div class="form-group">
+                <label>Chat ID</label>
+                <input type="text" id="telegramChatId" placeholder="Enter chat ID">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal('telegramModal')">Cancel</button>
+                <button class="btn btn-confirm" onclick="updateTelegram()">Update</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Delete this item?</div>
+            <div class="modal-buttons">
+                <button class="btn btn-cancel" onclick="closeModal('deleteModal')">NO</button>
+                <button class="btn btn-confirm" onclick="confirmDelete()">YES</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="successMessage">Command sent successfully!</div>
+            <div class="modal-buttons">
+                <button class="btn btn-confirm" onclick="closeModal('successModal')">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
